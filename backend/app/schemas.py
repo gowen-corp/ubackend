@@ -200,6 +200,49 @@ class EntityPermissionAssign(BaseModel):
     row_filter: Optional[Dict[str, Any]] = None
 
 
+# === Schema Builder Schemas ===
+
+class EntitySchemaField(BaseModel):
+    name: str
+    type: str = Field(..., pattern="^(string|number|integer|boolean|date|datetime|json|reference|array|email|text)$")
+    required: bool = False
+    description: Optional[str] = None
+    default: Optional[Any] = None
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
+    minimum: Optional[float] = None
+    maximum: Optional[float] = None
+    pattern: Optional[str] = None
+    enum: Optional[List[Any]] = None
+    reference_entity_id: Optional[int] = None
+    items_type: Optional[str] = None
+
+
+class FieldCreate(EntitySchemaField):
+    pass
+
+
+class FieldUpdate(BaseModel):
+    type: Optional[str] = None
+    required: Optional[bool] = None
+    description: Optional[str] = None
+    default: Optional[Any] = None
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
+    minimum: Optional[float] = None
+    maximum: Optional[float] = None
+    pattern: Optional[str] = None
+    enum: Optional[List[Any]] = None
+    reference_entity_id: Optional[int] = None
+    items_type: Optional[str] = None
+
+
+class EntitySchemaUpdate(BaseModel):
+    type: str = "object"
+    properties: Dict[str, Any] = Field(default_factory=dict)
+    required: List[str] = Field(default_factory=list)
+
+
 # === Health Check ===
 
 class HealthResponse(BaseModel):
