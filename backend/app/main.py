@@ -1,15 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import structlog
+import logging
 from app.config import settings
 from app.api.router import router as api_router
+from app.core.database import init_db
 
 # Настройка логгера
 structlog.configure(
     processors=[
         structlog.processors.JSONRenderer()
     ],
-    wrapper_class=structlog.make_filtering_bound_logger("INFO"),
+    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
 )
 
 logger = structlog.get_logger()
@@ -40,6 +42,8 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     logger.info("Application startup", module="main")
+    await init_db()
+    logger.info("Database initialized", module="main")
 
 
 @app.on_event("shutdown")

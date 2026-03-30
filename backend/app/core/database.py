@@ -1,6 +1,13 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
+from sqlalchemy.orm import declarative_base
 from app.config import settings
+
+# Базовый класс для моделей
+Base = declarative_base()
+
+# Metadata для Core API
+metadata = Base.metadata
 
 # Создание асинхронного движка
 engine = create_async_engine(

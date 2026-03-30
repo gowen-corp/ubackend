@@ -9,6 +9,26 @@ from app.schemas import RecordCreate, RecordUpdate, RecordResponse, RecordListRe
 router = APIRouter()
 
 
+class RecordCreate(BaseModel):
+    entity_id: int
+    data: Dict[str, Any] = {}
+    tenant_id: Optional[int] = None
+
+
+class RecordUpdate(BaseModel):
+    data: Dict[str, Any]
+
+
+class RecordResponse(BaseModel):
+    id: int
+    entity_id: int
+    data: Dict[str, Any]
+    created_by: Optional[int]
+    updated_by: Optional[int]
+    created_at: str
+    updated_at: Optional[str]
+
+
 @router.get("/", response_model=RecordListResponse)
 async def list_records(
     entity_id: int = Query(..., description="Entity ID to filter records"),
