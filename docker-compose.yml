@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL: Хранение данных и метаданных (JSONB)
+  db:
+    image: postgres:15-alpine
+    container_name: ubackend_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-ubackend}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password_change_me}
+      POSTGRES_DB: ${DB_NAME:-ubackend_db}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./uploads:/app/uploads
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ubackend}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis: Кэш, сессии и брокер очередей для ARQ
+  redis:
+    image: redis:7-alpine
+    container_name: ubackend_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (FastAPI)
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ubackend_api
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-ubackend}:${DB_PASSWORD:-secure_password_change_me}@db/${DB_NAME:-ubackend_db}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SECRET_KEY: ${SECRET_KEY:-super_secret_key_change_me}
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+
+  # Background Worker (ARQ)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ubackend_worker
+    restart: unless-stopped
+    command: arq app.worker.WorkerSettings
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-ubackend}:${DB_PASSWORD:-secure_password_change_me}@db/${DB_NAME:-ubackend_db}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SECRET_KEY: ${SECRET_KEY:-super_secret_key_change_me}
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ubackend_frontend
+    restart: unless-stopped
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  pg_data:
+  redis_data:
