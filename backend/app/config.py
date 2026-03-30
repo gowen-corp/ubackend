@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -13,10 +14,17 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
     
-    # Security
+    # Security - Local JWT
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    # Keycloak OIDC (optional)
+    KEYCLOAK_ENABLED: bool = False
+    KEYCLOAK_SERVER_URL: Optional[str] = None
+    KEYCLOAK_REALM: Optional[str] = None
+    KEYCLOAK_CLIENT_ID: Optional[str] = None
+    KEYCLOAK_CLIENT_SECRET: Optional[str] = None
     
     # Limits
     MAX_PAGE_SIZE: int = 100

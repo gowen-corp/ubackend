@@ -143,6 +143,63 @@ class EventOutboxResponse(EventOutboxBase):
     processed_at: Optional[datetime]
 
 
+# === Auth Schemas ===
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., description="Username or email")
+    password: Optional[str] = Field(None, description="Password (not used for Keycloak auth)")
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserInfo(BaseModel):
+    id: str
+    username: str
+    email: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
+    is_authenticated: bool = True
+
+
+class RoleBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    permissions: List[str] = Field(default_factory=list)
+
+
+class RoleCreate(RoleBase):
+    pass
+
+
+class RoleUpdate(BaseModel):
+    description: Optional[str] = None
+    permissions: Optional[List[str]] = None
+
+
+class RoleResponse(RoleBase):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    is_system: bool
+    created_at: datetime
+
+
+class UserRoleAssign(BaseModel):
+    role_id: int
+    expires_at: Optional[datetime] = None
+
+
+class EntityPermissionAssign(BaseModel):
+    role_id: int
+    can_read: bool = True
+    can_create: bool = False
+    can_update: bool = False
+    can_delete: bool = False
+    row_filter: Optional[Dict[str, Any]] = None
+
+
 # === Health Check ===
 
 class HealthResponse(BaseModel):
