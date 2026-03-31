@@ -64,7 +64,7 @@ services:
       dockerfile: Dockerfile
     container_name: ubackend_worker
     restart: unless-stopped
-    command: arq app.workers.worker_settings
+    command: arq app.workers.WorkerSettings
     volumes:
       - ./backend:/app
     depends_on:
@@ -74,11 +74,6 @@ services:
         condition: service_healthy
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-ubackend}:${DB_PASSWORD:-secure_password_change_me}@db/${DB_NAME:-ubackend_db}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      SECRET_KEY: ${SECRET_KEY:-super_secret_key_change_me}
 
   # Frontend (Next.js)
   frontend:
