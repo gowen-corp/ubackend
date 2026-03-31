@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import health, auth, entities, records, schema, workflow
+from . import health, auth, entities, records, schema, workflow, rbac
 
 router = APIRouter()
 
@@ -10,6 +10,7 @@ router.include_router(entities.router, prefix="/entities", tags=["Entities"])
 router.include_router(records.router, prefix="/records", tags=["Records"])
 router.include_router(schema.router, tags=["Schema"])
 router.include_router(workflow.router, tags=["Workflows"])
+router.include_router(rbac.router, prefix="/rbac", tags=["RBAC"])
 
 
 @router.get("/")
