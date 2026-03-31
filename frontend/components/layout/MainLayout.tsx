@@ -15,9 +15,11 @@ export default function Layout({
   const { isAuthenticated, logout } = useAuthStore()
   
   const navItems = [
-    { href: '/', label: 'Dashboard' },
+    { href: '/dashboard', label: 'Dashboard' },
     { href: '/entities', label: 'Entities' },
     { href: '/records', label: 'Records' },
+    { href: '/workflows', label: 'Workflows' },
+    { href: '/admin/roles', label: 'Admin' },
   ]
   
   return (
@@ -26,7 +28,7 @@ export default function Layout({
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <div className="mr-4 flex">
-            <Link href="/" className="mr-6 flex items-center space-x-2">
+            <Link href="/dashboard" className="mr-6 flex items-center space-x-2">
               <span className="font-bold">uBackend Studio</span>
             </Link>
             <nav className="flex items-center space-x-6 text-sm font-medium">
