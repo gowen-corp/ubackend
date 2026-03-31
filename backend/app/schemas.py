@@ -147,7 +147,14 @@ class EventOutboxResponse(EventOutboxBase):
 
 class LoginRequest(BaseModel):
     username: str = Field(..., description="Username or email")
-    password: Optional[str] = Field(None, description="Password (not used for Keycloak auth)")
+    password: str = Field(..., description="Password")
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=100, description="Username")
+    password: str = Field(..., min_length=6, description="Password")
+    email: Optional[str] = Field(None, description="Email")
+    full_name: Optional[str] = Field(None, description="Full name")
 
 
 class TokenResponse(BaseModel):

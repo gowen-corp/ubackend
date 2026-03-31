@@ -10,10 +10,11 @@ from app.core.auth import (
     get_current_user,
     create_local_token,
     keycloak_client,
-    settings
+    settings,
 )
-from app.schemas import TokenResponse, UserInfo, LoginRequest
+from app.schemas import TokenResponse, UserInfo, LoginRequest, RegisterRequest
 from app.services.auth_service import UserService
+from app.services.local_auth_service import LocalAuthService
 
 router = APIRouter()
 
@@ -24,37 +25,67 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Локальный логин (для сервисов и тестов)
+    Локальный логин с паролем (для разработки)
     
-    Для прода используйте Keycloak OIDC flow
+    Если KEYCLOAK_ENABLED=true — будет использоваться Keycloak
     """
-    # В реальной реализации здесь была бы проверка пароля
-    # Для MVP создаём токен для существующего пользователя
+    local_auth = LocalAuthService(db)
     
-    user_service = UserService(db)
+    # Пробуем локальную аутентификацию
+    result = await local_auth.authenticate(request.username, request.password or "")
     
-    # Проверяем существование пользователя
-    user = await user_service.get_user_by_external_id(request.username)
+    if result:
+        return result
     
-    if not user:
-        # Создаём нового (для первого входа)
-        user = await user_service.get_or_create_user(
-            external_id=request.username,
-            username=request.username
+    # Если не нашли локального пользователя и Keycloak включён — пробуем Keycloak
+    if keycloak_client.is_enabled and request.password:
+        # Здесь могла бы быть интеграция с Keycloak Resource Owner Password Credentials
+        pass
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid credentials",
+    )
+
+
+@router.post("/register", response_model=UserInfo)
+async def register(
+    request: RegisterRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Регистрация нового пользователя (только для локальной аутентификации)
+    
+    Не работает с Keycloak — там регистрация через Admin Console
+    """
+    if keycloak_client.is_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration disabled when Keycloak is enabled"
         )
     
-    # Создаём JWT токен
-    token = create_local_token(
-        user_id=str(user["id"]),
-        username=user["username"],
-        roles=["user"],  # Default role
-        email=user.get("email")
-    )
+    local_auth = LocalAuthService(db)
     
-    return {
-        "access_token": token,
-        "token_type": "bearer"
-    }
+    try:
+        user = await local_auth.register_user(
+            username=request.username,
+            password=request.password,
+            email=request.email,
+            full_name=request.full_name
+        )
+        
+        return {
+            "id": str(user["id"]),
+            "username": user["username"],
+            "email": user.get("email"),
+            "roles": ["user"],  # Default role
+            "is_authenticated": True
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 
 @router.get("/me", response_model=UserInfo)
@@ -108,3 +139,30 @@ async def logout():
         }
     
     return {"message": "Logged out locally"}
+
+
+@router.post("/change-password")
+async def change_password(
+    old_password: str,
+    new_password: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Смена пароля текущего пользователя
+    """
+    local_auth = LocalAuthService(db)
+    
+    success = await local_auth.change_password(
+        user_id=int(current_user["id"]),
+        old_password=old_password,
+        new_password=new_password
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid current password"
+        )
+    
+    return {"message": "Password changed successfully"}
