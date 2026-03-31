@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     MAX_PAGE_SIZE: int = 100
     MAX_FILTERS_DEPTH: int = 5
     
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    
     class Config:
         env_file = ".env"
 
