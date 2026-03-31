@@ -238,18 +238,27 @@ class LocalAuthService:
         
         for role_data in default_roles:
             existing = await self._get_role_by_name(role_data["name"])
-            
+
             if not existing:
                 # Создаём роль
                 insert_query = roles.insert().values(**role_data)
                 result = await self.db.execute(insert_query)
                 await self.db.flush()
-                
+
                 role_id = result.inserted_primary_key[0]
                 get_query = select(roles).where(roles.c.id == role_id)
                 get_result = await self.db.execute(get_query)
-                created_roles.append(dict(get_result.fetchone()))
+                row = get_result.fetchone()
+                if row:
+                    created_roles.append({
+                        "id": row.id,
+                        "name": row.name,
+                        "description": row.description,
+                        "permissions": row.permissions,
+                        "is_system": row.is_system,
+                        "created_at": row.created_at,
+                    })
             else:
                 created_roles.append(existing)
-        
+
         return created_roles
