@@ -19,7 +19,8 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-# CORS для фронтенда
+# Middleware (порядок важен!)
+# CORS должен быть ПЕРВЫМ middleware!
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # В проде заменить на конкретный домен
@@ -28,7 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Middleware (порядок важен!)
 app.middleware("http")(rate_limit_middleware)
 app.middleware("http")(logging_middleware)
 
