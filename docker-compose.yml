@@ -54,6 +54,8 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-ubackend}:${DB_PASSWORD:-secure_password_change_me}@db/${DB_NAME:-ubackend_db}
     ports:
       - "8000:8000"
 
@@ -74,6 +76,8 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-ubackend}:${DB_PASSWORD:-secure_password_change_me}@db/${DB_NAME:-ubackend_db}
 
   # Frontend (Next.js)
   frontend:
