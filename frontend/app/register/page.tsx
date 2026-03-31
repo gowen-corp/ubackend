@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
+import { useAuthStore } from '@/store/authStore'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { handleApiError } from '@/lib/errorHandler'
 
 interface RegisterForm {
   username: string
@@ -19,28 +21,23 @@ interface RegisterForm {
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { login } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   const {
     register,
     handleSubmit,
     formState: { errors },
     watch,
   } = useForm<RegisterForm>()
-  
+
   const password = watch('password')
-  
+
   const onSubmit = async (data: RegisterForm) => {
     setError(null)
-    
-    if (data.password !== data.confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-    
     setIsLoading(true)
-    
+
     try {
       await api.post('/auth/register', {
         username: data.username,
@@ -48,17 +45,26 @@ export default function RegisterPage() {
         email: data.email || undefined,
         full_name: data.full_name || undefined,
       })
-      
-      // После регистрации автоматически логиним
-      const loginResponse = await api.post('/auth/login', {
-        username: data.username,
-        password: data.password,
-      })
-      
-      localStorage.setItem('token', loginResponse.data.access_token)
+
+      // После регистрации автоматически логиним через authStore
+      await login(data.username, data.password)
       router.push('/')
-    } catch (e: any) {
-      setError(e.response?.data?.detail || 'Registration failed')
+    } catch (e: unknown) {
+      // Детальная обработка ошибок
+      const errorMessage = handleApiError(e, 'Registration failed')
+      
+      // Специальная обработка для случая успешной регистрации но неудачного логина
+      if (e && typeof e === 'object' && 'response' in (e as any)) {
+        const axiosError = e as any
+        if (axiosError.response?.status === 401) {
+          setError('Registration successful, but automatic login failed. Please log in manually.')
+          router.push('/login')
+          return
+        }
+      }
+      
+      setError(errorMessage)
+      console.error('Registration error:', e)
     } finally {
       setIsLoading(false)
     }
@@ -91,6 +97,10 @@ export default function RegisterPage() {
                   minLength: {
                     value: 3,
                     message: 'Username must be at least 3 characters',
+                  },
+                  maxLength: {
+                    value: 50,
+                    message: 'Username must not exceed 50 characters',
                   },
                 })}
               />
@@ -151,8 +161,12 @@ export default function RegisterPage() {
                 {...register('password', {
                   required: 'Password is required',
                   minLength: {
-                    value: 6,
-                    message: 'Password must be at least 6 characters',
+                    value: 8,
+                    message: 'Password must be at least 8 characters',
+                  },
+                  maxLength: {
+                    value: 128,
+                    message: 'Password must not exceed 128 characters',
                   },
                 })}
               />
@@ -185,7 +199,7 @@ export default function RegisterPage() {
             
             {error && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                {error}
+                {String(error)}
               </div>
             )}
             

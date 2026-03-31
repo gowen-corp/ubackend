@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
+// Используем относительный путь для работы через Next.js proxy
+// Все запросы будут идти на /api/v1 → проксироваться на backend
+const API_BASE_URL = '/api/v1'
 
 // Создаём базовый axios инстанс
 export const api = axios.create({
@@ -36,23 +38,23 @@ export interface Entity {
   id: number
   name: string
   description?: string
-  schema: Record<string, any>
+  schema: Record<string, unknown>
   is_active: boolean
   version: number
   created_at: string
   updated_at?: string
 }
 
-export interface Record {
+export interface BackendRecord {
   id: number
   entity_id: number
-  data: Record<string, any>
+  data: Record<string, unknown>
   created_at: string
   updated_at?: string
 }
 
 export interface RecordListResponse {
-  items: Record[]
+  items: BackendRecord[]
   total: number
   page: number
   page_size: number
@@ -73,12 +75,12 @@ export const entitiesApi = {
   
   get: (id: number) => api.get<Entity>(`/entities/${id}`),
   
-  create: (data: { name: string; description?: string; schema?: Record<string, any> }) =>
+  create: (data: { name: string; description?: string; schema?: Record<string, unknown> }) =>
     api.post<Entity>('/entities', data),
-  
+
   update: (id: number, data: Partial<Entity>) =>
     api.put<Entity>(`/entities/${id}`, data),
-  
+
   delete: (id: number) => api.delete<void>(`/entities/${id}`),
 }
 
@@ -86,7 +88,7 @@ export const entitiesApi = {
 export const recordsApi = {
   list: (
     entityId: number,
-    filters?: Record<string, any>,
+    filters?: Record<string, unknown>,
     page = 1,
     page_size = 20
   ) => {
@@ -95,28 +97,28 @@ export const recordsApi = {
       page: page.toString(),
       page_size: page_size.toString(),
     })
-    
+
     if (filters) {
       params.append('filters', JSON.stringify(filters))
     }
-    
+
     return api.get<RecordListResponse>(`/records?${params}`)
   },
-  
-  get: (id: number) => api.get<Record>(`/records/${id}`),
-  
-  create: (data: { entity_id: number; data: Record<string, any> }) =>
-    api.post<Record>('/records', data),
-  
-  update: (id: number, data: { data: Record<string, any> }) =>
-    api.put<Record>(`/records/${id}`, data),
+
+  get: (id: number) => api.get<BackendRecord>(`/records/${id}`),
+
+  create: (data: { entity_id: number; data: Record<string, unknown> }) =>
+    api.post<BackendRecord>('/records', data),
+
+  update: (id: number, data: { data: Record<string, unknown> }) =>
+    api.put<BackendRecord>(`/records/${id}`, data),
   
   delete: (id: number) => api.delete<void>(`/records/${id}`),
 }
 
 // === Auth API ===
 export const authApi = {
-  login: (username: string, password?: string) =>
+  login: (username: string, password: string) =>
     api.post<{ access_token: string; token_type: string }>('/auth/login', {
       username,
       password,

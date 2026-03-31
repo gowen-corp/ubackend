@@ -24,9 +24,48 @@ logger = structlog.get_logger()
 
 class LocalAuthService:
     """Сервис локальной аутентификации"""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    def _row_to_user_dict(self, row) -> Dict[str, Any]:
+        """Convert SQLAlchemy row to user dict"""
+        return {
+            "id": row.id,
+            "external_id": row.external_id,
+            "username": row.username,
+            "email": row.email,
+            "full_name": row.full_name,
+            "is_active": row.is_active,
+            "is_superuser": row.is_superuser,
+            "tenant_id": row.tenant_id,
+            "metadata": row.metadata,
+            "last_login_at": row.last_login_at,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+
+    def _filter_password_hash(self, metadata: Optional[Dict]) -> Optional[Dict]:
+        """Return metadata copy without password_hash"""
+        if not metadata:
+            return None
+        filtered = metadata.copy()
+        filtered.pop("password_hash", None)
+        return filtered
+
+    def _validate_password(self, password: str) -> None:
+        """
+        Валидация сложности пароля
+        
+        Raises:
+            ValueError: Если пароль не соответствует требованиям
+        """
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not any(c.isupper() for c in password):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.isdigit() for c in password):
+            raise ValueError("Password must contain at least one digit")
     
     async def register_user(
         self,
@@ -37,28 +76,31 @@ class LocalAuthService:
     ) -> Dict[str, Any]:
         """
         Регистрация нового пользователя
-        
+
         Args:
             username: Уникальное имя пользователя
             password: Пароль (будет захеширован)
             email: Email (опционально)
             full_name: Полное имя (опционально)
-        
+
         Returns:
             Данные пользователя
-        
+
         Raises:
-            ValueError: Если пользователь с таким именем уже существует
+            ValueError: Если пользователь с таким именем уже существует или пароль не соответствует требованиям
         """
+        # Валидация сложности пароля
+        self._validate_password(password)
+        
         # Проверка существования
         check_query = select(users).where(users.c.username == username)
         check_result = await self.db.execute(check_query)
         if check_result.fetchone():
             raise ValueError(f"User '{username}' already exists")
-        
+
         # Хеширование пароля
         password_hash = self._hash_password(password)
-        
+
         # Создание пользователя
         insert_query = users.insert().values(
             external_id=f"local:{username}",  # Префикс для локальных пользователей
@@ -70,9 +112,9 @@ class LocalAuthService:
         )
         result = await self.db.execute(insert_query)
         await self.db.flush()
-        
+
         user_id = result.inserted_primary_key[0]
-        
+
         # Назначаем роль "user" по умолчанию
         default_role = await self._get_role_by_name("user")
         if default_role:
@@ -80,15 +122,22 @@ class LocalAuthService:
                 user_id=user_id,
                 role_id=default_role["id"]
             ))
-        
+
+        await self.db.flush()
+
         # Получаем созданного пользователя
         get_query = select(users).where(users.c.id == user_id)
         get_result = await self.db.execute(get_query)
-        user = dict(get_result.fetchone())
-        
+        row = get_result.fetchone()
+
+        if not row:
+            raise ValueError("Failed to retrieve created user")
+
+        user = self._row_to_user_dict(row)
+
         # Удаляем хеш из ответа
-        user["metadata"].pop("password_hash", None)
-        
+        user["metadata"] = self._filter_password_hash(user["metadata"])
+
         return user
     
     async def authenticate(
@@ -98,7 +147,7 @@ class LocalAuthService:
     ) -> Optional[Dict[str, Any]]:
         """
         Аутентификация пользователя по паролю
-        
+
         Returns:
             Данные пользователя с токеном или None если неверные credentials
         """
@@ -108,31 +157,31 @@ class LocalAuthService:
             users.c.is_active == True
         )
         result = await self.db.execute(query)
-        user = result.fetchone()
-        
-        if not user:
+        row = result.fetchone()
+
+        if not row:
             logger.warning(f"User '{username}' not found")
             return None
-        
-        user_dict = dict(user)
-        
-        # Проверка пароля
-        password_hash = user_dict["metadata"].get("password_hash")
+
+        user_dict = self._row_to_user_dict(row)
+
+        # Проверка пароля (null-safe)
+        password_hash = (user_dict.get("metadata") or {}).get("password_hash")
         if not password_hash:
             logger.warning(f"User '{username}' has no password hash")
             return None
-        
+
         if not self._verify_password(password, password_hash):
             logger.warning(f"Invalid password for user '{username}'")
             return None
-        
+
         # Обновление last_login
         await self.db.execute(
             users.update().where(users.c.id == user_dict["id"]).values(
                 last_login_at=datetime.utcnow()
             )
         )
-        
+
         # Получение ролей
         roles_query = (
             select(roles.c.name)
@@ -141,7 +190,7 @@ class LocalAuthService:
         )
         roles_result = await self.db.execute(roles_query)
         user_roles_list = [row[0] for row in roles_result.fetchall()]
-        
+
         # Создание токена
         token = create_local_token(
             user_id=str(user_dict["id"]),
@@ -149,10 +198,10 @@ class LocalAuthService:
             roles=user_roles_list,
             email=user_dict.get("email")
         )
-        
+
         # Возвращаем данные без хеша
-        user_dict["metadata"].pop("password_hash", None)
-        
+        user_dict["metadata"] = self._filter_password_hash(user_dict["metadata"])
+
         return {
             "user": user_dict,
             "token": token,
@@ -167,35 +216,43 @@ class LocalAuthService:
     ) -> bool:
         """
         Смена пароля пользователя
-        
+
         Returns:
             True если успешно, False если старый пароль неверный
+            
+        Raises:
+            ValueError: Если новый пароль не соответствует требованиям
         """
+        # Валидация нового пароля
+        self._validate_password(new_password)
+        
         query = select(users).where(users.c.id == user_id)
         result = await self.db.execute(query)
         user = result.fetchone()
-        
+
         if not user:
             return False
+
+        user_dict = self._row_to_user_dict(user)
         
-        user_dict = dict(user)
-        password_hash = user_dict["metadata"].get("password_hash")
-        
+        # Проверка старого пароля (null-safe)
+        password_hash = (user_dict.get("metadata") or {}).get("password_hash")
+
         # Проверка старого пароля
         if not password_hash or not self._verify_password(old_password, password_hash):
             return False
-        
+
         # Обновление пароля
         new_hash = self._hash_password(new_password)
-        metadata = user_dict["metadata"].copy()
+        metadata = (user_dict.get("metadata") or {}).copy()
         metadata["password_hash"] = new_hash
-        
+
         await self.db.execute(
             users.update().where(users.c.id == user_id).values(
                 metadata=metadata
             )
         )
-        
+
         return True
     
     def _hash_password(self, password: str) -> str:

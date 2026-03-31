@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { handleApiError } from '@/lib/errorHandler'
 
 interface LoginForm {
   username: string
@@ -16,22 +17,39 @@ interface LoginForm {
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isLoading } = useAuthStore()
+  const { login, isLoading, isAuthenticated, checkAuth } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
-  
+
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginForm>()
-  
+
+  // Проверка аутентификации при монтировании
+  useEffect(() => {
+    // Если уже аутентифицирован — редирект
+    if (isAuthenticated) {
+      router.push('/')
+      return
+    }
+    
+    // Если есть токен в localStorage, но состояние не синхронизировано
+    const token = localStorage.getItem('token')
+    if (token) {
+      checkAuth()
+    }
+  }, [isAuthenticated, checkAuth, router])
+
   const onSubmit = async (data: LoginForm) => {
     setError(null)
     try {
       await login(data.username, data.password)
       router.push('/')
-    } catch (e: any) {
-      setError(e.response?.data?.detail || 'Login failed')
+    } catch (error) {
+      // Детальная обработка ошибок
+      setError(handleApiError(error, 'Login failed'))
+      console.error('Login error:', error)
     }
   }
   
@@ -57,7 +75,17 @@ export default function LoginPage() {
                 id="username"
                 type="text"
                 placeholder="Enter your username"
-                {...register('username', { required: 'Username is required' })}
+                {...register('username', {
+                  required: 'Username is required',
+                  minLength: {
+                    value: 3,
+                    message: 'Username must be at least 3 characters',
+                  },
+                  maxLength: {
+                    value: 50,
+                    message: 'Username must not exceed 50 characters',
+                  },
+                })}
               />
               {errors.username && (
                 <p className="text-sm text-destructive">{errors.username.message}</p>
@@ -75,7 +103,13 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 placeholder="Enter your password"
-                {...register('password', { required: 'Password is required' })}
+                {...register('password', {
+                  required: 'Password is required',
+                  minLength: {
+                    value: 8,
+                    message: 'Password must be at least 8 characters',
+                  },
+                })}
               />
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
@@ -84,7 +118,7 @@ export default function LoginPage() {
             
             {error && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                {error}
+                {String(error)}
               </div>
             )}
             

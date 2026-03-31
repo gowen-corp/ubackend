@@ -26,22 +26,21 @@ async def login(
 ):
     """
     Локальный логин с паролем (для разработки)
-    
+
     Если KEYCLOAK_ENABLED=true — будет использоваться Keycloak
     """
     local_auth = LocalAuthService(db)
-    
+
     # Пробуем локальную аутентификацию
     result = await local_auth.authenticate(request.username, request.password or "")
-    
+
     if result:
-        return result
-    
-    # Если не нашли локального пользователя и Keycloak включён — пробуем Keycloak
-    if keycloak_client.is_enabled and request.password:
-        # Здесь могла бы быть интеграция с Keycloak Resource Owner Password Credentials
-        pass
-    
+        # Возвращаем в формате TokenResponse
+        return TokenResponse(
+            access_token=result["token"],
+            token_type=result["token_type"]
+        )
+
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid credentials",
