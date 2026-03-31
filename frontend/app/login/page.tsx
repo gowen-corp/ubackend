@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 interface LoginForm {
   username: string
-  password?: string
+  password: string
 }
 
 export default function LoginPage() {
@@ -69,14 +69,17 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Password (optional for local auth)
+                Password
               </label>
               <Input
                 id="password"
                 type="password"
                 placeholder="Enter your password"
-                {...register('password')}
+                {...register('password', { required: 'Password is required' })}
               />
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password.message}</p>
+              )}
             </div>
             
             {error && (
@@ -96,9 +99,9 @@ export default function LoginPage() {
           
           <div className="mt-4 text-center text-sm text-muted-foreground">
             <p>
-              Using Keycloak?{' '}
-              <Link href="/keycloak-login" className="text-primary hover:underline">
-                Login with SSO
+              Don&apos;t have an account?{' '}
+              <Link href="/register" className="text-primary hover:underline">
+                Sign up
               </Link>
             </p>
           </div>

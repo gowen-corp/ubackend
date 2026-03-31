@@ -147,7 +147,14 @@ class EventOutboxResponse(EventOutboxBase):
 
 class LoginRequest(BaseModel):
     username: str = Field(..., description="Username or email")
-    password: Optional[str] = Field(None, description="Password (not used for Keycloak auth)")
+    password: str = Field(..., description="Password")
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=100, description="Username")
+    password: str = Field(..., min_length=6, description="Password")
+    email: Optional[str] = Field(None, description="Email")
+    full_name: Optional[str] = Field(None, description="Full name")
 
 
 class TokenResponse(BaseModel):
@@ -198,6 +205,49 @@ class EntityPermissionAssign(BaseModel):
     can_update: bool = False
     can_delete: bool = False
     row_filter: Optional[Dict[str, Any]] = None
+
+
+# === Schema Builder Schemas ===
+
+class EntitySchemaField(BaseModel):
+    name: str
+    type: str = Field(..., pattern="^(string|number|integer|boolean|date|datetime|json|reference|array|email|text)$")
+    required: bool = False
+    description: Optional[str] = None
+    default: Optional[Any] = None
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
+    minimum: Optional[float] = None
+    maximum: Optional[float] = None
+    pattern: Optional[str] = None
+    enum: Optional[List[Any]] = None
+    reference_entity_id: Optional[int] = None
+    items_type: Optional[str] = None
+
+
+class FieldCreate(EntitySchemaField):
+    pass
+
+
+class FieldUpdate(BaseModel):
+    type: Optional[str] = None
+    required: Optional[bool] = None
+    description: Optional[str] = None
+    default: Optional[Any] = None
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
+    minimum: Optional[float] = None
+    maximum: Optional[float] = None
+    pattern: Optional[str] = None
+    enum: Optional[List[Any]] = None
+    reference_entity_id: Optional[int] = None
+    items_type: Optional[str] = None
+
+
+class EntitySchemaUpdate(BaseModel):
+    type: str = "object"
+    properties: Dict[str, Any] = Field(default_factory=dict)
+    required: List[str] = Field(default_factory=list)
 
 
 # === Health Check ===
