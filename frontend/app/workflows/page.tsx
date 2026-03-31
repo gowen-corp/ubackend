@@ -32,9 +32,17 @@ export default function WorkflowsPage() {
       setIsLoading(true)
       const response = await fetch('/api/v1/workflows')
       const data = await response.json()
-      setWorkflows(data)
+      
+      // Проверяем что данные это массив
+      if (Array.isArray(data)) {
+        setWorkflows(data)
+      } else {
+        console.error('Workflows data is not an array:', data)
+        setWorkflows([])
+      }
     } catch (e) {
       console.error('Failed to load workflows:', e)
+      setWorkflows([])
     } finally {
       setIsLoading(false)
     }
