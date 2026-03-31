@@ -5,15 +5,11 @@ import logging
 from app.config import settings
 from app.api.router import router as api_router
 from app.core.database import init_db
-from app.services.local_auth_service import LocalAuthService
+from app.core.logging import setup_logging, logging_middleware, health_checker
+from app.core.rate_limiter import rate_limit_middleware
 
-# Настройка логгера
-structlog.configure(
-    processors=[
-        structlog.processors.JSONRenderer()
-    ],
-    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
-)
+# Настройка логирования
+setup_logging(settings.LOG_LEVEL)
 
 logger = structlog.get_logger()
 
@@ -32,12 +28,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware (порядок важен!)
+app.middleware("http")(rate_limit_middleware)
+app.middleware("http")(logging_middleware)
+
 app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "version": settings.VERSION}
+    """
+    Health check endpoint с метриками
+    
+    Returns:
+        status: healthy/unhealthy
+        uptime_seconds: время работы
+        total_requests: всего запросов
+        total_errors: всего ошибок
+        error_rate: процент ошибок
+    """
+    return await health_checker.check()
+
+
+@app.get("/ready")
+async def readiness_check():
+    """
+    Readiness probe для Kubernetes
+    
+    Проверяет готовность приложения принимать запросы.
+    """
+    return {"status": "ready"}
 
 
 @app.on_event("startup")
@@ -49,9 +69,12 @@ async def startup_event():
     # Инициализация ролей по умолчанию
     from app.core.database import async_session_maker
     async with async_session_maker() as db:
+        from app.services.local_auth_service import LocalAuthService
         local_auth = LocalAuthService(db)
         roles = await local_auth.get_or_create_default_roles()
         logger.info(f"Default roles initialized: {[r['name'] for r in roles]}")
+    
+    logger.info("Application startup complete")
 
 
 @app.on_event("shutdown")
