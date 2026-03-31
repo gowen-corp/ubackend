@@ -52,12 +52,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-ubackend}:${DB_PASSWORD:-secure_password_change_me}@db/${DB_NAME:-ubackend_db}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      SECRET_KEY: ${SECRET_KEY:-super_secret_key_change_me}
-      LOG_LEVEL: INFO
+    env_file:
+      - .env
     ports:
       - "8000:8000"
 
@@ -68,7 +64,7 @@ services:
       dockerfile: Dockerfile
     container_name: ubackend_worker
     restart: unless-stopped
-    command: arq app.workers.WorkerSettings
+    command: arq app.workers.worker_settings
     volumes:
       - ./backend:/app
     depends_on:
@@ -76,6 +72,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-ubackend}:${DB_PASSWORD:-secure_password_change_me}@db/${DB_NAME:-ubackend_db}
       REDIS_HOST: redis
