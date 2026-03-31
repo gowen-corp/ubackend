@@ -250,6 +250,79 @@ class EntitySchemaUpdate(BaseModel):
     required: List[str] = Field(default_factory=list)
 
 
+# === Workflow Schemas ===
+
+class WorkflowStepConfig(BaseModel):
+    """Конфигурация шага workflow"""
+    # Для http_request
+    url: Optional[str] = None
+    method: Optional[str] = "POST"
+    headers: Optional[Dict[str, str]] = None
+    body: Optional[Dict[str, Any]] = None
+    
+    # Для send_email
+    to: Optional[str] = None
+    subject: Optional[str] = None
+    body: Optional[str] = None
+    
+    # Для delay
+    seconds: Optional[int] = None
+    
+    # Для update_record/create_record
+    entity_id: Optional[int] = None
+    data: Optional[Dict[str, Any]] = None
+    
+    # Для trigger_event
+    event_type: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None
+
+
+class WorkflowStep(BaseModel):
+    type: str = Field(..., pattern="^(http_request|send_email|delay|update_record|create_record|trigger_event)$")
+    name: Optional[str] = None
+    config: WorkflowStepConfig = Field(default_factory=WorkflowStepConfig)
+
+
+class WorkflowBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    trigger_event: str = Field(..., min_length=1, description="Событие для запуска (например, 'entity.created')")
+    description: Optional[str] = None
+    steps: List[WorkflowStep] = Field(default_factory=list)
+
+
+class WorkflowCreate(WorkflowBase):
+    tenant_id: Optional[int] = None
+
+
+class WorkflowUpdate(BaseModel):
+    name: Optional[str] = None
+    trigger_event: Optional[str] = None
+    description: Optional[str] = None
+    steps: Optional[List[WorkflowStep]] = None
+    is_active: Optional[bool] = None
+
+
+class WorkflowResponse(WorkflowBase):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    tenant_id: Optional[int]
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+class WorkflowRunResponse(BaseModel):
+    id: int
+    workflow_id: int
+    status: str  # running, completed, failed
+    context: Dict[str, Any]
+    current_step: int
+    error_message: Optional[str]
+    started_at: datetime
+    completed_at: Optional[datetime]
+
+
 # === Health Check ===
 
 class HealthResponse(BaseModel):
