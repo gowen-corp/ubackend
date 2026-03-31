@@ -7,6 +7,7 @@ Worker для обработки фоновых задач:
 - Выполнение workflow steps
 """
 from arq.connections import RedisSettings
+from arq.cron import cron
 from app.config import settings
 from app.workers.tasks import process_event, send_notification, execute_workflow_step, process_outbox_events
 
@@ -40,5 +41,5 @@ class WorkerSettings:
     handle_signals = True
     cron_jobs = [
         # Обработка outbox каждую секунду
-        {"coroutine": process_outbox_events, "second": "*"},
+        cron(process_outbox_events, second=0),
     ]

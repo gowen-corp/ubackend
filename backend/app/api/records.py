@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any, Optional
 
@@ -7,26 +7,6 @@ from app.services.query_core import QueryCore
 from app.schemas import RecordCreate, RecordUpdate, RecordResponse, RecordListResponse
 
 router = APIRouter()
-
-
-class RecordCreate(BaseModel):
-    entity_id: int
-    data: Dict[str, Any] = {}
-    tenant_id: Optional[int] = None
-
-
-class RecordUpdate(BaseModel):
-    data: Dict[str, Any]
-
-
-class RecordResponse(BaseModel):
-    id: int
-    entity_id: int
-    data: Dict[str, Any]
-    created_by: Optional[int]
-    updated_by: Optional[int]
-    created_at: str
-    updated_at: Optional[str]
 
 
 @router.get("/", response_model=RecordListResponse)
